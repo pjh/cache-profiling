@@ -20,6 +20,7 @@
  * KP_DEBUG_RECOVERY enables debug messages specifically related to recovery.
  * KP_DEBUG_LOCK enables verbose messages for mutex and rwlock lock/unlock.
  */
+#define KP_PRINT
 //#define KP_ASSERT
 //#define KP_EVAL_LOG
 //#define KP_DEBUG
@@ -70,10 +71,14 @@
 #else
 #define kp_log(fp, f, a...)  do { ; } while(0)
 #endif
+#ifdef KP_PRINT
 #define kp_print(f, a...)  do { \
 	fprintf(stdout, "KP: %lu: " f, pthread_self(), ##a); \
 	fflush(stdout); \
 	} while(0)
+#else
+#define kp_print(f, a...)  do { ; } while(0)
+#endif
 #define kp_warn(f, a...)  do { \
 	fprintf(stderr, "**WARNING**: %lu: %s: " f, pthread_self(), __func__, ##a); \
 	fflush(stderr); \

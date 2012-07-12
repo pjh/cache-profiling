@@ -7,6 +7,9 @@
 #include <stdlib.h>
 #include "kp_macros.h"
 #include "kp_recovery.h"
+#include "ptlcalls.h"
+
+#define DO_PTLSIM
 
 /* Forward declarations: */
 void set_process_affinity(int cpu);
@@ -48,16 +51,29 @@ void set_process_affinity(int cpu)
 	kp_print("pinned this process to CPU=0x%X\n", cpu);
 }
 
-/* Total cache size (in bytes) is BLOCK_SIZE * SETS * WAYS */
+/* Total cache size (in bytes) is BLOCK_SIZE * SETS * WAYS.
+ * 8 MB cache (8388608 bytes): 64 * 8192 * 16
+ * 2 MB cache (2097152 bytes): 64 * 4096 *  8*/
+//#define CACHE_8MB
+#define CACHE_2MB
+
+#ifdef CACHE_8MB
 #define BLOCK_SIZE 64
 #define SETS 8192
 #define WAYS 16
+#endif
+#ifdef CACHE_2MB
+#define BLOCK_SIZE 64
+#define SETS 4096
+#define WAYS 8
+#endif
 
 #define NUM_MEM_REGIONS 2
-#define NUM_LOOPS 10
+#define NUM_LOOPS 1
 
 void idea1(void)
 {
+#ifdef KP_PRINT
 	const char *description = "Idea 1: simply write every single byte "
 		"in a memory region that is the size of the L3 cache, then write "
 		"every single byte again in a _different_ memory region that is "
@@ -65,6 +81,7 @@ void idea1(void)
 		"two memory regions several times, so that each memory region "
 		"causes the other memory region to be evicted when it is written "
 		"in the cache.";
+#endif
 	kp_print("%s\n", description);
 
 	unsigned int i, j, k;
@@ -93,16 +110,25 @@ void idea1(void)
 
 	char new_byte = initial_byte + 1;
 	unsigned int num_loops = NUM_LOOPS;
+#ifndef DO_PTLSIM
 	unsigned int print_frequency = 1;
+#endif
 
 	kp_print("Trashing cache: block_size=%u B, sets=%u, ways=%u\n",
 			(unsigned int)BLOCK_SIZE, (unsigned int)SETS,
 			(unsigned int)WAYS);
+#ifdef DO_PTLSIM
+	kp_print("PTL: calling ptlcall_switch_to_sim(), then running cache-trash "
+			"loop\n");
+	ptlcall_switch_to_sim();
+#endif
 	for (i = 0; i < num_loops; i++) {
+#ifndef DO_PTLSIM
 		if (i % print_frequency == 0) {
 			kp_print("Trashing cache: loop %u, new_byte=%c, %u memory "
 					"regions\n", i, new_byte, num_mem_regions);
 		}
+#endif
 		for (j = 0; j < num_mem_regions; j++) {
 			//for (k = 0; k < mem_region_size; k++) {  //try: k += BLOCK_SIZE?
 			for (k = 0; k < mem_region_size; k+= BLOCK_SIZE) {
@@ -120,6 +146,10 @@ void idea1(void)
 		}
 		new_byte++;
 	}
+#ifdef DO_PTLSIM
+	ptlcall_single_flush("-stop");
+	kp_print("PTL: just called ptlcall_single_flush(\"-stop\")\n");
+#endif
 	kp_print("Trashed cache for %u loops; final new_byte=%c\n", i, new_byte);
 	kp_print("Total number of writes to memory regions: %lu\n",
 			//num_loops * num_mem_regions * mem_region_size);

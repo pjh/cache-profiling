@@ -183,13 +183,15 @@ void kp_memcpy(void *dest, const void *src, size_t n, bool use_nvm)
  */
 void kp_strncpy(char *dest, const char *src, size_t n, bool use_nvm)
 {
+#ifdef R_ASSERT
 	char *ret;
 
 	ret = strncpy(dest, src, n);
-#ifdef R_ASSERT
 	if (ret != dest) {
 		r_die("strncpy: dest=%p, but ret=%p\n", dest, ret);
 	}
+#else
+	strncpy(dest, src, n);
 #endif
 	if (use_nvm) {
 		/* dest is the address of the first byte of the destination
@@ -317,6 +319,7 @@ unsigned int flush_range(const void *addr, const size_t size)
 			break;
 		}
 		r_debug("calling clflush(%p) (%lu)\n", (void *)ptr, ptr);
+		//printf("calling clflush(%p) (%lu)\n", (void *)ptr, ptr);
 
 		asm volatile (
 				"clflush (%0)"
